@@ -1,5 +1,4 @@
 import numpy as np
-from pdb import set_trace
 
 
 def policy_q_evaluation(policy, R, T, discount, iterations):
@@ -7,8 +6,8 @@ def policy_q_evaluation(policy, R, T, discount, iterations):
 	num_actions = T.shape[1]
 	Q = np.zeros((num_states, num_actions))
 	for i in range(iterations):
-		expected_q = np.sum(np.multiply(policy, Q), 1)
-		delta = R + discount * np.broadcast_to(expected_q, R.shape)
+		expected_v = np.sum(np.multiply(policy, Q), 1)
+		delta = R + discount * np.broadcast_to(expected_v, R.shape)
 		Q = np.sum(np.multiply(T, delta), 2)
 	return Q
 
@@ -22,6 +21,47 @@ def policy_v_evaluation(policy, R, T, discount, iterations):
 		V = np.sum(np.multiply(policy, Q), 1)
 	return V
 
+def check_q_bellman_optimal(Q, R, T, discount, diff=1e-03):
+	num_states, num_actions = Q.shape
+	for state in range(num_states):
+		for action in range(num_actions):
+			expectation = 0
+			for ns in range(num_states):
+				expectation += T[state, action, ns] * (R[state, action, ns] + discount * np.max(Q[ns]))
+			assert np.isclose(Q[state,action], expectation, atol=diff)
+
+
+def check_v_bellman_optimal(V, R, T, discount, diff=1e-03):
+	num_states, num_actions = V.shape[0], T.shape[1]
+	for state in range(num_states):
+		expectations = []
+		for action in range(num_actions):
+			expectation = 0
+			for ns in range(num_states):
+				expectation += T[state, action, ns] * (R[state, action, ns] + discount * V[ns])
+			expectations.append(expectation)
+		assert np.isclose(V[state], max(expectations), atol=diff)
+	
+def check_q_bellman_consistent(Q, policy, R, T, discount, diff=1e-03):
+	num_states, num_actions = Q.shape
+	for state in range(num_states):
+		for action in range(num_actions):
+			expectation = 0
+			for ns in range(num_states):
+				expected_v = 0
+				for na in range(num_actions):
+					expected_v += policy[ns, na] * Q[ns, na]
+				expectation += T[state, action, ns] * (R[state, action, ns] + discount * expected_v)
+			assert np.isclose(Q[state,action], expectation, atol=diff)
+
+def check_v_bellman_consistent(V, policy, R, T, discount, diff=1e-03):
+	num_states, num_actions= V.shape[0], T.shape[1]
+	for state in range(num_states):
+		expectation = 0
+		for action in range(num_actions):
+			for ns in range(num_states):
+				expectation += policy[state, action] * T[state, action, ns] * (R[state, action, ns] + discount * V[ns]) 
+		assert np.isclose(V[state], expectation, atol=diff)
 
 # Assume reward is of form R(s,a,s')
 def q_value_iteration(num_states, num_actions, R, T, discount, iterations):
